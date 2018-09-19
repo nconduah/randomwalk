@@ -5,67 +5,149 @@
 <html>
 <head>
 <script type="text/javascript">
-var canvas, context;
-var particles = [];
-var WIDTH;
-var HEIGHT;
-var diffusionDistance=20;
-var color;
+	var canvas, context;
+	var particles = [];
+	var WIDTH;
+	var HEIGHT;
+	var diffusionDistance=20;
+	var xDiff = diffusionDistance;
+	var yDiff = diffusionDistance;
+	var color;
+	var backAndForth = false;
+	var bounceOffWall = false;
+	var gameTimer = null;
 
-window.onload = initialize;
-function initialize(){
-	// add canvas to overlay
-	canvas = document.getElementById('myCanvas');
-	context = canvas.getContext('2d');
-	WIDTH = canvas.width;
-	HEIGHT= canvas.height;
-	color = 'green';
-	var n = 1,i,x,y,dx=0,dy=0,p; 
+	window.onload = initialize;
 
-	// build particles			
-	for (i = 0; i < n; i+=1) {
-		x = 0.5 *WIDTH;
-		y = 0.5 *HEIGHT;	
-		p = Particle(x,y,dx,dy);
-		particles.push(p);
+	function initialize(){
+		// add canvas to overlay
+		canvas = document.getElementById('myCanvas');
+		context = canvas.getContext('2d');
+		WIDTH = canvas.width / 2;
+		HEIGHT= canvas.height / 2;
+		color = 'green';
+		var n = 3,i,x,y,dx=0,dy=0,p; 
+
+		// build particles			
+		for (i = 0; i < n; i+=1) {
+			x = 0.5 *WIDTH;
+			y = 0.5 *HEIGHT;
+			p = Particle(x,y,dx,dy,getRandomRgb(),1,1);
+			particles.push(p);
+		}
+
+		// draw rectangle on load
+		DrawRect(0,0,WIDTH,HEIGHT);
 	}
-}
-function Particle(x,y,dx,dy){
-	return {x:x,y:y,dx:dx,dy:dy};
-}
 
-function updateParticles() {
-	var i,p,start = {};
-	//context.clearRect(0, 0, WIDTH, HEIGHT);
-	length = particles.length;
-// loop over particles
-	for (i = 0; i < length; i++) {
-		p = particles[i];
+	function Particle(x,y,dx,dy,clr,xdir,ydir){
+		return {x:x,y:y,dx:dx,dy:dy,clr:clr,xdir:xdir,ydir:ydir};
+	}
 
-		start.x = p.x; start.y = p.y;
-		// at present this is a random step size
-		p.dx = diffusionDistance*Math.random(); 
-		p.dy = diffusionDistance*Math.random();
-		checkWallCollision(p);
+	function updateParticles() {
+		var i,p,start = {};
+
+		//context.clearRect(0, 0, WIDTH, HEIGHT);
+		length = particles.length;
+
+		// loop over particles
+		for (i = 0; i < length; i++) {
+			p = particles[i];
+
+			start.x = p.x; start.y = p.y;
+			// at present this is a random step size
+			p.dx = diffusionDistance*Math.random(); 
+			p.dy = diffusionDistance*Math.random();
+
+			if (backAndForth)
+			{
+				p.dx = p.dx * (Math.random() < 0.5 ? -1 : 1);
+				p.dy = p.dy * (Math.random() < 0.5 ? -1 : 1);
+			}
+			
+			checkWallCollision(p);
+			
+			p.x += p.dx*p.xdir; p.y += p.dy*p.ydir;
+			DrawCircle(p.x,p.y,color);
+			DrawLine(start.x,start.y,p.x,p.y, p.clr);
+
+			//console.log("Particle " + i + " x:" + p.x + " y:" + p.y)
+		}		
 		
-		p.x += p.dx; p.y += p.dy;
-		DrawCircle(p.x,p.y,color);
-		DrawLine(start.x,start.y,p.x,p.y);
-	}		
-	DrawRect(0,0,WIDTH,HEIGHT);
-}
-var checkWallCollision = function(p){
-	/* make particle bounce off walls
-		enter code here
-	*/
-	
-};
-/*        
+		DrawRect(0,0,WIDTH,HEIGHT);
+	}
+
+	var checkWallCollision = function(p){
+		/* make particle bounce off walls
+			enter code here
+		*/
+		//var unitPt = normalize(p.x, p.y);		
+
+		// point has hit the wall - check if x and y coordinates are less 0 or greater than width or height. If so change dx and dy and general direction
+		if (bounceOffWall)
+		{
+			// keep point inside boundary
+			lowerbound = 0.01;
+			upperbound = 0.99;
+			if (p.x <= lowerbound || p.x >= WIDTH*upperbound)
+			{
+				//console.log("Flip x dir from " + p.xdir + " to " + -p.xdir)
+				p.xdir = -p.xdir;
+			}
+			
+			if (p.y <= lowerbound || p.y >= HEIGHT*upperbound)
+			{
+				//console.log("Flip y dir from " + p.ydir + " to " + -p.ydir)
+				p.ydir = -p.ydir;
+			}
+			
+			// take point to the boundary
+			newx = p.x + p.dx*p.xdir;
+			newy = p.y + p.dy*p.ydir;
+			if (newx <= lowerbound)
+			{
+				// update dx to make sure it doesn't go beyond boundary
+				p.dx = Math.abs(lowerbound - p.x);
+				//console.log("Take to x lower bound with step of " + p.dx)
+			}
+
+			if (newx >= WIDTH*upperbound)
+			{
+				// update dx to make sure it doesn't go beyond boundary
+				p.dx = Math.abs(WIDTH*upperbound - p.x);
+				//console.log("Take to x upper bound with step of " + p.dx)
+			}
+
+			if (newy <= lowerbound)
+			{
+				// update dx to make sure it doesn't go beyond boundary
+				p.dy = Math.abs(lowerbound - p.y);
+				//console.log("Take to y lower bound with step of " + p.dy)
+			}
+
+			if (newy >= HEIGHT*upperbound)
+			{
+				// update dx to make sure it doesn't go beyond boundary
+				p.dy = Math.abs(HEIGHT*upperbound - p.y);
+				//console.log("Take to y upper bound with step of  " + p.dy)
+			}
+		}
+	};
+			
 	function normalize(x,y){
 		// calculate len here to normalize the vector
-		//return {x:x/len,y:y/len};  // return a unit vector
+		// len = Math.sqrt(WIDTH ^ 2 + HEIGHT ^ 2);
+		len = Math.sqrt(x ^ 2 + y ^ 2);
+		return {x:x/len,y:y/len};  // return a unit vector
 	}
-*/
+
+	function getRandomRgb() {
+		var num = Math.round(0xffffff * Math.random());
+		var r = num >> 16;
+		var g = num >> 8 & 255;
+		var b = num & 255;
+		return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+	}
 
 	function DrawCircle(x,y,color){
 		context.fillStyle = color;
@@ -74,6 +156,7 @@ var checkWallCollision = function(p){
 		context.closePath();
 		context.fill();
 	}
+
 	function DrawRect(x,y,dx,dy){
 		context.beginPath();
 		context.lineWidth="6";
@@ -81,8 +164,9 @@ var checkWallCollision = function(p){
 		context.rect(x,y,dx,dy);
 		context.stroke();
 	}
-	function DrawLine(x1,y1,x2,y2){
-		context.strokeStyle = 'rgb(255,0, 0)'; // red
+
+	function DrawLine(x1,y1,x2,y2,clr){
+		context.strokeStyle = clr//'rgb(255,0, 0)'; // red
 		context.lineWidth   = 4;
 		context.beginPath();
 		context.moveTo(x1,y1);
@@ -91,21 +175,40 @@ var checkWallCollision = function(p){
 		context.fill();
 		context.stroke();
 		context.closePath();
-	}			
- 	function RunPhysics(){timer = setInterval(updateParticles,100); // calls Run every xxx ms
-  }
+	}	
 
-  function ResetTimer(){
-    if(timer!== null){
-      clearInterval(timer); 
-      timer = null;
-    }
-  }
+	function RunPhysics(){
+		if (gameTimer===null)
+		{
+			gameTimer = setInterval(updateParticles,100); // calls Run every xxx ms
+		}
+
+		// check if back and forth is allowed
+		backAndForth = document.getElementById("allowBackAndForth").checked
+		bounceOffWall = document.getElementById("bounceoffwall").checked
+	}
+
+	function ResetTimer(){
+		if(gameTimer!== null){
+			clearInterval(gameTimer); 
+			gameTimer = null;
+		}
+	}
+
 </script>
 </head>
 <body>
+	<div>
+		<input type="checkbox" id="allowBackAndForth" />
+		<label for="allowBackAndForth">Randomized Path Direction</label>
+		<input type="checkbox" id="bounceoffwall" checked/>
+		<label for="bounceoffwall">Bounce off walls</label>
+	</div>
+	<br/>
     <input type="button" value="Start" onclick= "RunPhysics()" />
     <input type="button" value="Stop"  onclick= "ResetTimer()" />
+	<input type="button" value="Start new walker"  onclick= "initialize()" />
+	<br/>
 	<canvas id='myCanvas' width = "800" height='600' >
 </body>
 </html>
